@@ -1,7 +1,7 @@
 name: 'AI-based PR Reviewer & Summarizer with Chat Capabilities'
 description: 'AI-based PR Reviewer & Summarizer with Chat Capabilities'
 branding:
-  icon: 'rabbit'
+  icon: 'award'
   color: 'orange'
 author: 'Bunny'
 inputs:
