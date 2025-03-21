@@ -483,7 +483,7 @@ ${filename}: ${summary}
     if (releaseNotesResponse === '') {
       info('release notes: nothing obtained from openai')
     } else {
-      let message = '### Summary by Bunny\n\n'
+      let message = '### Summary by AI Reviewer\n\n'
       message += releaseNotesResponse
       try {
         await commenter.updateDescription(
