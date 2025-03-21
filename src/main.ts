@@ -71,8 +71,8 @@ async function run(): Promise<void> {
   try {
     // check if the event is pull_request
     if (
-      // process.env.GITHUB_EVENT_NAME === 'pull_request' ||
-      // process.env.GITHUB_EVENT_NAME === 'pull_request_target'
+      process.env.GITHUB_EVENT_NAME === 'pull_request' ||
+      process.env.GITHUB_EVENT_NAME === 'pull_request_target' ||
       process.env.GITHUB_EVENT_NAME === 'issue_comment'
     ) {
       await codeReview(lightBot, heavyBot, options, prompts)
