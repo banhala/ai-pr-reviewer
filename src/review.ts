@@ -57,8 +57,8 @@ export const codeReview = async (
     }
 
     try {
-      // PR 정보 가져오기
-      const pull_request = await context.octokit.pulls.get({
+      // PR 정보 가져오기 - context.octokit 대신 octokit 사용
+      const pull_request = await octokit.pulls.get({
         owner: context.repo.owner,
         repo: context.repo.repo,
         pull_number: context.payload.issue.number
