@@ -153,7 +153,7 @@ jobs:
             sourcebranches="${sourcebranches#\"}"
 
             git config pull.rebase false
-            git config user.name github-actions
+            git config user.name Bunny
             git config user.email github-actions@users.noreply.github.com
 
             git checkout $basebranch

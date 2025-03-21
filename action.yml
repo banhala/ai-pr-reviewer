@@ -1,9 +1,9 @@
 name: 'AI-based PR Reviewer & Summarizer with Chat Capabilities'
 description: 'AI-based PR Reviewer & Summarizer with Chat Capabilities'
 branding:
-  icon: 'git-merge'
+  icon: 'rabbit'
   color: 'orange'
-author: 'CodeRabbit LLC'
+author: 'Bunny'
 inputs:
   debug:
     required: false
