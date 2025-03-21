@@ -45,17 +45,46 @@ export const codeReview = async (
     )
     return
   }
-  if (context.payload.pull_request == null) {
-    warning('Skipped: context.payload.pull_request is null')
-    return
-  }
 
   const inputs: Inputs = new Inputs()
-  inputs.title = context.payload.pull_request.title
-  if (context.payload.pull_request.body != null) {
-    inputs.description = commenter.getDescription(
-      context.payload.pull_request.body
-    )
+
+  // issue_comment 이벤트 처리를 위한 로직 추가
+  if (context.eventName === 'issue_comment') {
+    // issue_comment가 PR에 달린 것인지 확인
+    if (!context.payload.issue.pull_request) {
+      warning('Skipped: comment is not on a pull request')
+      return
+    }
+
+    try {
+      // PR 정보 가져오기
+      const pull_request = await context.octokit.pulls.get({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: context.payload.issue.number
+      })
+      
+      inputs.title = pull_request.data.title
+      if (pull_request.data.body != null) {
+        inputs.description = commenter.getDescription(pull_request.data.body)
+      }
+    } catch (error) {
+      warning(`Failed to fetch pull request data: ${error}`)
+      return
+    }
+  } else {
+    // 기존 pull_request 이벤트 처리
+    if (context.payload.pull_request == null) {
+      warning('Skipped: context.payload.pull_request is null')
+      return
+    }
+    
+    inputs.title = context.payload.pull_request.title
+    if (context.payload.pull_request.body != null) {
+      inputs.description = commenter.getDescription(
+        context.payload.pull_request.body
+      )
+    }
   }
 
   // if the description contains ignore_keyword, skip
