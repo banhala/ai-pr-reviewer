@@ -48,6 +48,55 @@ export const codeReview = async (
 
   console.log(context);
 
+  if (context.eventName === 'issue_comment') {
+    // issue_comment가 PR에 달린 것인지 확인
+    if (!context.payload.issue.pull_request) {
+      warning('Skipped: comment is not on a pull request')
+      return
+    }
+
+    try {
+      // 1. PR 기본 정보 가져오기
+      const pull_request = await octokit.pulls.get({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: context.payload.issue.number
+      })
+
+      // 2. PR의 파일 변경사항 가져오기
+      const files = await octokit.pulls.listFiles({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: context.payload.issue.number
+      })
+
+      // 3. PR의 커밋 정보 가져오기
+      const commits = await octokit.pulls.listCommits({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: context.payload.issue.number
+      })
+
+      // context.payload에 필요한 정보를 모두 할당
+      context.payload.pull_request = {
+        ...pull_request.data,
+        files: files.data,
+        commits: commits.data
+      }
+
+      // SHA 업데이트 (최신 커밋 SHA로)
+      if (commits.data.length > 0) {
+        context.sha = commits.data[commits.data.length - 1].sha
+      }
+
+    } catch (error) {
+      warning(`TS: Failed to fetch pull request data: ${error}`)
+      return
+    }
+  }
+
+  console.log('TS');
+
   if (context.payload.pull_request == null) {
     warning('Skipped: context.payload.pull_request is null')
     return
