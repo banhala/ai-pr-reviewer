@@ -37,13 +37,66 @@ export const codeReview = async (
 
   if (
     context.eventName !== 'pull_request' &&
-    context.eventName !== 'pull_request_target'
+    context.eventName !== 'pull_request_target' &&
+    context.eventName !== 'issue_comment'
   ) {
     warning(
       `Skipped: current event is ${context.eventName}, only support pull_request event`
     )
     return
   }
+
+  console.log(context);
+
+  if (context.eventName === 'issue_comment') {
+    // issue_comment가 PR에 달린 것인지 확인
+    if (!context.payload.issue.pull_request) {
+      warning('Skipped: comment is not on a pull request')
+      return
+    }
+
+    try {
+      // 1. PR 기본 정보 가져오기
+      const pull_request = await octokit.pulls.get({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: context.payload.issue.number
+      })
+
+      // 2. PR의 파일 변경사항 가져오기
+      const files = await octokit.pulls.listFiles({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: context.payload.issue.number
+      })
+
+      // 3. PR의 커밋 정보 가져오기
+      const commits = await octokit.pulls.listCommits({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: context.payload.issue.number
+      })
+
+      // context.payload에 필요한 정보를 모두 할당
+      context.payload.pull_request = {
+        ...pull_request.data,
+        files: files.data,
+        commits: commits.data
+      }
+
+      // SHA 업데이트 (최신 커밋 SHA로)
+      if (commits.data.length > 0) {
+        context.sha = commits.data[commits.data.length - 1].sha
+      }
+
+    } catch (error) {
+      warning(`TS: Failed to fetch pull request data: ${error}`)
+      return
+    }
+  }
+
+  console.log('TS');
+
   if (context.payload.pull_request == null) {
     warning('Skipped: context.payload.pull_request is null')
     return
@@ -430,7 +483,7 @@ ${filename}: ${summary}
     if (releaseNotesResponse === '') {
       info('release notes: nothing obtained from openai')
     } else {
-      let message = '### Summary by CodeRabbit\n\n'
+      let message = '### Summary by AI Reviewer\n\n'
       message += releaseNotesResponse
       try {
         await commenter.updateDescription(
@@ -460,14 +513,6 @@ ${SHORT_SUMMARY_END_TAG}
 
 ---
 
-<details>
-<summary>Uplevel your code reviews with CodeRabbit Pro</summary>
-
-### CodeRabbit Pro
-
-If you like this project, please support us by purchasing the [Pro version](https://coderabbit.ai). The Pro version has advanced context, superior noise reduction and several proprietary improvements compared to the open source version. Moreover, CodeRabbit Pro is free for open source projects.
-
-</details>
 `
 
   statusMsg += `
@@ -688,53 +733,24 @@ ${commentChain}
     statusMsg += `
 ${
   reviewsFailed.length > 0
-    ? `<details>
-<summary>Files not reviewed due to errors (${reviewsFailed.length})</summary>
+    ? `Files not reviewed due to errors (${reviewsFailed.length})
 
 * ${reviewsFailed.join('\n* ')}
-
-</details>
 `
     : ''
 }
 ${
   reviewsSkipped.length > 0
-    ? `<details>
-<summary>Files skipped from review due to trivial changes (${
-        reviewsSkipped.length
-      })</summary>
+    ? `Files skipped from review due to trivial changes (${reviewsSkipped.length})
 
 * ${reviewsSkipped.join('\n* ')}
-
-</details>
 `
     : ''
 }
-<details>
-<summary>Review comments generated (${reviewCount + lgtmCount})</summary>
+Review comments generated (${reviewCount + lgtmCount})
 
 * Review: ${reviewCount}
 * LGTM: ${lgtmCount}
-
-</details>
-
----
-
-<details>
-<summary>Tips</summary>
-
-### Chat with <img src="https://avatars.githubusercontent.com/in/347564?s=41&u=fad245b8b4c7254fe63dd4dcd4d662ace122757e&v=4" alt="Image description" width="20" height="20">  CodeRabbit Bot (\`@coderabbitai\`)
-- Reply on review comments left by this bot to ask follow-up questions. A review comment is a comment on a diff or a file.
-- Invite the bot into a review comment chain by tagging \`@coderabbitai\` in a reply.
-
-### Code suggestions
-- The bot may make code suggestions, but please review them carefully before committing since the line number ranges may be misaligned. 
-- You can edit the comment made by the bot and manually tweak the suggestion if it is slightly off.
-
-### Pausing incremental reviews
-- Add \`@coderabbitai: ignore\` anywhere in the PR description to pause further reviews from the bot.
-
-</details>
 `
     // add existing_comment_ids_block with latest head sha
     summarizeComment += `\n${commenter.addReviewedCommitId(
