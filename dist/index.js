@@ -3911,7 +3911,7 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
 // eslint-disable-next-line camelcase
 const context = _actions_github__WEBPACK_IMPORTED_MODULE_1__.context;
 const repo = context.repo;
-const COMMENT_GREETING = `${(0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('bot_icon')}   CodeRabbit`;
+const COMMENT_GREETING = `${(0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('bot_icon')}    AI Reviewer`;
 const COMMENT_TAG = '<!-- This is an auto-generated comment by OSS CodeRabbit -->';
 const COMMENT_REPLY_TAG = '<!-- This is an auto-generated reply by OSS CodeRabbit -->';
 const SUMMARIZE_TAG = '<!-- This is an auto-generated comment: summarize by OSS CodeRabbit -->';
@@ -4660,7 +4660,8 @@ async function run() {
     try {
         // check if the event is pull_request
         if (process.env.GITHUB_EVENT_NAME === 'pull_request' ||
-            process.env.GITHUB_EVENT_NAME === 'pull_request_target') {
+            process.env.GITHUB_EVENT_NAME === 'pull_request_target' ||
+            process.env.GITHUB_EVENT_NAME === 'issue_comment') {
             await (0,_review__WEBPACK_IMPORTED_MODULE_3__/* .codeReview */ .z)(lightBot, heavyBot, options, prompts);
         }
         else if (process.env.GITHUB_EVENT_NAME === 'pull_request_review_comment') {
@@ -6523,7 +6524,7 @@ class TokenLimits {
     requestTokens;
     responseTokens;
     knowledgeCutOff;
-    constructor(model = 'gpt-3.5-turbo') {
+    constructor(model = 'gpt-4o') {
         this.knowledgeCutOff = '2021-09-01';
         switch (model) {
             case 'gpt-4-32k':
@@ -6543,6 +6544,11 @@ class TokenLimits {
                 this.responseTokens = 4000;
                 this.knowledgeCutOff = '2023-12-01';
                 break;
+            case 'gpt-4o':
+                this.maxTokens = 128000
+                this.responseTokens = 4000
+                this.knowledgeCutOff = '2024-11-20'
+                break
             default:
                 this.maxTokens = 4000;
                 this.responseTokens = 1000;
@@ -6987,7 +6993,7 @@ $comment
 // eslint-disable-next-line camelcase
 const context = _actions_github__WEBPACK_IMPORTED_MODULE_1__.context;
 const repo = context.repo;
-const ASK_BOT = '@coderabbitai';
+const ASK_BOT = '/ai-review';
 const handleReviewComment = async (heavyBot, options, prompts) => {
     const commenter = new _commenter__WEBPACK_IMPORTED_MODULE_2__/* .Commenter */ .Es();
     const inputs = new _inputs__WEBPACK_IMPORTED_MODULE_5__/* .Inputs */ .k();
@@ -7288,25 +7294,75 @@ const codeReview = async (lightBot, heavyBot, options, prompts) => {
     const commenter = new lib_commenter/* Commenter */.Es();
     const openaiConcurrencyLimit = pLimit(options.openaiConcurrencyLimit);
     const githubConcurrencyLimit = pLimit(options.githubConcurrencyLimit);
+    
     if (context.eventName !== 'pull_request' &&
-        context.eventName !== 'pull_request_target') {
+        context.eventName !== 'pull_request_target' &&
+        context.eventName !== 'issue_comment') {
         (0,core.warning)(`Skipped: current event is ${context.eventName}, only support pull_request event`);
         return;
     }
+    
+    if (context.eventName === 'issue_comment') {
+        if (!context.payload.issue.pull_request) {
+            (0,core.warning)('Skipped: comment is not on a pull request');
+            return;
+        }
+    
+        try {
+            // 1. PR 기본 정보 가져오기
+            const pull_request = await octokit/* octokit.pulls.get */.K.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.issue.number
+            });
+    
+            // 2. PR의 파일 변경사항 가져오기
+            const files = await octokit/* octokit.pulls.listFiles */.K.pulls.listFiles({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.issue.number
+            });
+    
+            // 3. PR의 커밋 정보 가져오기
+            const commits = await octokit/* octokit.pulls.listCommits */.K.pulls.listCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.issue.number
+            });
+    
+            // context.payload에 필요한 정보를 모두 할당
+            context.payload.pull_request = {
+                ...pull_request.data,
+                files: files.data,
+                commits: commits.data
+            };
+    
+            // SHA 업데이트 (최신 커밋 SHA로)
+            if (commits.data.length > 0) {
+                context.sha = commits.data[commits.data.length - 1].sha;
+            }
+    
+        } catch (error) {
+            (0,core.warning)(`Failed to fetch pull request data: ${error}`);
+            return;
+        }
+    }
+
+    console.log(context);
+    
     if (context.payload.pull_request == null) {
         (0,core.warning)('Skipped: context.payload.pull_request is null');
         return;
     }
+    
     const inputs = new lib_inputs/* Inputs */.k();
     inputs.title = context.payload.pull_request.title;
     if (context.payload.pull_request.body != null) {
         inputs.description = commenter.getDescription(context.payload.pull_request.body);
     }
-    // if the description contains ignore_keyword, skip
-    if (inputs.description.includes(ignoreKeyword)) {
-        (0,core.info)('Skipped: description contains ignore_keyword');
-        return;
-    }
+
+    console.log('JS');
+
     // as gpt-3.5-turbo isn't paying attention to system message, add to inputs for now
     inputs.systemMessage = options.systemMessage;
     // get SUMMARIZE_TAG message
@@ -7451,29 +7507,19 @@ ${hunks.oldHunk}
         (0,core.error)('Skipped: no files to review');
         return;
     }
-    let statusMsg = `<details>
-<summary>Commits</summary>
-Files that changed from the base of the PR and between ${highestReviewedCommitId} and ${context.payload.pull_request.head.sha} commits.
-</details>
-${filesAndChanges.length > 0
+    let statusMsg = `${filesAndChanges.length > 0
         ? `
-<details>
-<summary>Files selected (${filesAndChanges.length})</summary>
+**Files selected (${filesAndChanges.length})**
 
 * ${filesAndChanges
             .map(([filename, , , patches]) => `${filename} (${patches.length})`)
             .join('\n* ')}
-</details>
 `
         : ''}
 ${filterIgnoredFiles.length > 0
-        ? `
-<details>
-<summary>Files ignored due to filter (${filterIgnoredFiles.length})</summary>
+        ? `Files ignored due to filter (${filterIgnoredFiles.length})
 
 * ${filterIgnoredFiles.map(file => file.filename).join('\n* ')}
-
-</details>
 `
         : ''}
 `;
@@ -7600,34 +7646,18 @@ ${lib_commenter/* SHORT_SUMMARY_END_TAG */.Zb}
 
 ---
 
-<details>
-<summary>Uplevel your code reviews with CodeRabbit Pro</summary>
-
-### CodeRabbit Pro
-
-If you like this project, please support us by purchasing the [Pro version](https://coderabbit.ai). The Pro version has advanced context, superior noise reduction and several proprietary improvements compared to the open source version. Moreover, CodeRabbit Pro is free for open source projects.
-
-</details>
 `;
     statusMsg += `
 ${skippedFiles.length > 0
-        ? `
-<details>
-<summary>Files not processed due to max files limit (${skippedFiles.length})</summary>
+        ? `Files not processed due to max files limit (${skippedFiles.length})
 
 * ${skippedFiles.join('\n* ')}
-
-</details>
 `
         : ''}
 ${summariesFailed.length > 0
-        ? `
-<details>
-<summary>Files not summarized due to errors (${summariesFailed.length})</summary>
+        ? `Files not summarized due to errors (${summariesFailed.length})
 
 * ${summariesFailed.join('\n* ')}
-
-</details>
 `
         : ''}
 `;
@@ -7766,48 +7796,26 @@ ${commentChain}
         await Promise.all(reviewPromises);
         statusMsg += `
 ${reviewsFailed.length > 0
-            ? `<details>
-<summary>Files not reviewed due to errors (${reviewsFailed.length})</summary>
+            ? `Files not reviewed due to errors (${reviewsFailed.length})
 
 * ${reviewsFailed.join('\n* ')}
 
-</details>
 `
             : ''}
 ${reviewsSkipped.length > 0
-            ? `<details>
-<summary>Files skipped from review due to trivial changes (${reviewsSkipped.length})</summary>
+            ? `Files skipped from review due to trivial changes (${reviewsSkipped.length})
 
 * ${reviewsSkipped.join('\n* ')}
 
-</details>
 `
             : ''}
-<details>
-<summary>Review comments generated (${reviewCount + lgtmCount})</summary>
+
+**Review comments generated (${reviewCount + lgtmCount})**
 
 * Review: ${reviewCount}
 * LGTM: ${lgtmCount}
 
-</details>
 
----
-
-<details>
-<summary>Tips</summary>
-
-### Chat with <img src="https://avatars.githubusercontent.com/in/347564?s=41&u=fad245b8b4c7254fe63dd4dcd4d662ace122757e&v=4" alt="Image description" width="20" height="20">  CodeRabbit Bot (\`@coderabbitai\`)
-- Reply on review comments left by this bot to ask follow-up questions. A review comment is a comment on a diff or a file.
-- Invite the bot into a review comment chain by tagging \`@coderabbitai\` in a reply.
-
-### Code suggestions
-- The bot may make code suggestions, but please review them carefully before committing since the line number ranges may be misaligned. 
-- You can edit the comment made by the bot and manually tweak the suggestion if it is slightly off.
-
-### Pausing incremental reviews
-- Add \`@coderabbitai: ignore\` anywhere in the PR description to pause further reviews from the bot.
-
-</details>
 `;
         // add existing_comment_ids_block with latest head sha
         summarizeComment += `\n${commenter.addReviewedCommitId(existingCommitIdsBlock, context.payload.pull_request.head.sha)}`;
