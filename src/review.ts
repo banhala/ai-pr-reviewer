@@ -733,36 +733,24 @@ ${commentChain}
     statusMsg += `
 ${
   reviewsFailed.length > 0
-    ? `<details>
-<summary>Files not reviewed due to errors (${reviewsFailed.length})</summary>
+    ? `Files not reviewed due to errors (${reviewsFailed.length})
 
 * ${reviewsFailed.join('\n* ')}
-
-</details>
 `
     : ''
 }
 ${
   reviewsSkipped.length > 0
-    ? `<details>
-<summary>Files skipped from review due to trivial changes (${
-        reviewsSkipped.length
-      })</summary>
+    ? `Files skipped from review due to trivial changes (${reviewsSkipped.length})
 
 * ${reviewsSkipped.join('\n* ')}
-
-</details>
 `
     : ''
 }
-<details>
-<summary>Review comments generated (${reviewCount + lgtmCount})</summary>
+Review comments generated (${reviewCount + lgtmCount})
 
 * Review: ${reviewCount}
 * LGTM: ${lgtmCount}
-
-</details>
-
 `
     // add existing_comment_ids_block with latest head sha
     summarizeComment += `\n${commenter.addReviewedCommitId(
