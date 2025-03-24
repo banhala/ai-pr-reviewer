@@ -24,10 +24,10 @@ export class TokenLimits {
         this.responseTokens = 4000
         this.knowledgeCutOff = '2023-12-01'
         break
-      case 'gpt-4o-2024-11-20':
+      case 'gpt-4o':
         this.maxTokens = 128000
         this.responseTokens = 4000
-        this.knowledgeCutOff = '2023-12-01'
+        this.knowledgeCutOff = '2024-11-20'
         break
       default:
         this.maxTokens = 4000
