@@ -4,7 +4,7 @@ export class TokenLimits {
   responseTokens: number
   knowledgeCutOff: string
 
-  constructor(model = 'gpt-3.5-turbo') {
+  constructor(model = 'gpt-4o-2024-11-20') {
     this.knowledgeCutOff = '2021-09-01'
     switch (model) {
       case 'gpt-4-32k':
@@ -20,6 +20,11 @@ export class TokenLimits {
         this.responseTokens = 2000
         break
       case 'gpt-4-turbo-preview':
+        this.maxTokens = 128000
+        this.responseTokens = 4000
+        this.knowledgeCutOff = '2023-12-01'
+        break
+      case 'gpt-4o-2024-11-20':
         this.maxTokens = 128000
         this.responseTokens = 4000
         this.knowledgeCutOff = '2023-12-01'
