@@ -2802,6 +2802,7 @@ function chunk_THGZSONF_getEncodingNameForModel(model) {
     case "gpt-4-0613":
     case "gpt-4-0314":
     case "gpt-4":
+    case "gpt-4o-2024-11-20":
     case "text-embedding-ada-002": {
       return "cl100k_base";
     }
