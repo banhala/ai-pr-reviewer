@@ -6521,11 +6521,10 @@ minimatch.unescape = unescape_unescape;
 ;// CONCATENATED MODULE: ./lib/limits.js
 class TokenLimits {
     maxTokens;
-    maxCompletionTokens;
     requestTokens;
     responseTokens;
     knowledgeCutOff;
-    constructor(model = 'o3-mini') {
+    constructor(model = 'gpt-4o') {
         this.knowledgeCutOff = '2021-09-01';
         switch (model) {
             case 'gpt-4-32k':
@@ -6549,9 +6548,6 @@ class TokenLimits {
                 this.maxTokens = 128000
                 this.responseTokens = 4000
                 this.knowledgeCutOff = '2024-11-20'
-                break
-            case 'o3-mini':
-                this.maxCompletionTokens = 100000
                 break
             default:
                 this.maxTokens = 4000;
